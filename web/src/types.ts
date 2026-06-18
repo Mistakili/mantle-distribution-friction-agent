@@ -5,6 +5,9 @@ export interface DistributionReport {
     name: string;
     assetClass: string;
     distributionChannel: string;
+    imageUrl: string;
+    issuerImageUrl: string;
+    issuer: string;
   };
   generatedAt: string;
   distributionHealth: {
@@ -24,6 +27,7 @@ export interface DistributionReport {
     fdvUsd: number | null;
     priceChange24hPct: number | null;
     volumeToMcap: number | null;
+    imageUrl?: string | null;
     source: string;
   } | null;
   ecosystem: {
@@ -45,4 +49,7 @@ export interface AssetOption {
   name: string;
   assetClass: string;
   channel: string;
+  imageUrl?: string;
+  issuer?: string;
+  issuerImageUrl?: string;
 }

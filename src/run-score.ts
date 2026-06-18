@@ -8,17 +8,22 @@ import {
 import { buildReport, type DistributionReport } from "./report.js";
 
 export async function runScore(assetId: string): Promise<DistributionReport> {
-  const asset = resolveAsset(assetId);
+  const base = resolveAsset(assetId);
   const ecosystem = await fetchMantleEcosystemMetrics();
 
   let market = null;
-  if (asset.coingeckoId) {
+  if (base.coingeckoId) {
     try {
-      market = await fetchMarketMetrics(asset.coingeckoId);
+      market = await fetchMarketMetrics(base.coingeckoId);
     } catch {
       market = null;
     }
   }
+
+  const asset = {
+    ...base,
+    imageUrl: market?.imageUrl ?? base.imageUrl,
+  };
 
   const distributionHealth = scoreDistributionHealth(market, ecosystem);
   const complianceFriction = scoreComplianceFriction(asset);

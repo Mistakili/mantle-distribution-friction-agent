@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
 import type { AssetScorePreview } from "../api";
+import { AssetAvatar } from "./AssetAvatar";
 
 interface AssetRow {
   id: string;
   symbol: string;
-  icon: string;
+  imageUrl?: string;
   preview?: AssetScorePreview | "loading" | "error";
 }
 
@@ -43,8 +44,9 @@ export function CompareStrip({
                   : "border-zinc-800/80 bg-zinc-900/40 hover:border-zinc-700"
               }`}
             >
-              <div className="text-xs text-zinc-400 mb-2">
-                {a.icon} {a.symbol}
+              <div className="flex items-center gap-2 text-xs text-zinc-400 mb-2">
+                <AssetAvatar src={a.imageUrl} symbol={a.symbol} size="xs" />
+                <span className="font-medium text-zinc-300">{a.symbol}</span>
               </div>
               {p ? (
                 <div className="space-y-1.5">

@@ -4,6 +4,7 @@ export interface MarketMetrics {
   fdvUsd: number | null;
   priceChange24hPct: number | null;
   volumeToMcap: number | null;
+  imageUrl: string | null;
   source: string;
   fetchedAt: string;
 }
@@ -40,6 +41,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 export async function fetchMarketMetrics(coingeckoId: string): Promise<MarketMetrics> {
   const url = `https://api.coingecko.com/api/v3/coins/${coingeckoId}?localization=false&tickers=false&community_data=false&developer_data=false`;
   const data = await fetchJson<{
+    image?: { large?: string; small?: string };
     market_data: {
       market_cap: { usd: number | null };
       total_volume: { usd: number | null };
@@ -58,6 +60,7 @@ export async function fetchMarketMetrics(coingeckoId: string): Promise<MarketMet
     fdvUsd: data.market_data.fully_diluted_valuation.usd,
     priceChange24hPct: data.market_data.price_change_percentage_24h,
     volumeToMcap,
+    imageUrl: data.image?.large ?? data.image?.small ?? null,
     source: "CoinGecko",
     fetchedAt: new Date().toISOString(),
   };

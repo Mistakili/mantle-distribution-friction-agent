@@ -10,8 +10,10 @@ import {
 } from "./api";
 import type { AssetOption, DistributionReport } from "./types";
 import { AmbientBackground } from "./components/AmbientBackground";
+import { AssetAvatar, IssuerBadge } from "./components/AssetAvatar";
 import { CompareStrip } from "./components/CompareStrip";
 import { DistributionFlowViz } from "./components/DistributionFlowViz";
+import { PartnerStrip } from "./components/PartnerStrip";
 import { ScoreRing } from "./components/ScoreRing";
 
 type LoadPhase = "idle" | "loading" | "slow" | "done" | "error";
@@ -82,17 +84,43 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-const ASSET_ICONS: Record<string, string> = {
-  spcxx: "🚀",
-  tslax: "⚡",
-  syrupusdt: "🏦",
-};
-
 const FALLBACK_ASSETS: AssetOption[] = [
-  { id: "spcxx", symbol: "SPCXx", name: "SpaceX xStock", assetClass: "tokenized_pre_ipo_equity", channel: "Fluxion + Bybit" },
-  { id: "tslax", symbol: "TSLAx", name: "Tesla xStock", assetClass: "tokenized_public_equity", channel: "Fluxion + Bybit" },
-  { id: "syrupusdt", symbol: "syrupUSDT", name: "Maple syrupUSDT", assetClass: "institutional_yield", channel: "Aave on Mantle" },
+  {
+    id: "spcxx",
+    symbol: "SPCXx",
+    name: "SpaceX xStock",
+    assetClass: "tokenized_pre_ipo_equity",
+    channel: "Fluxion + Bybit",
+    imageUrl: "/assets/spcxx.png",
+    issuer: "xStocksFi",
+    issuerImageUrl: "/assets/xstocks.png",
+  },
+  {
+    id: "tslax",
+    symbol: "TSLAx",
+    name: "Tesla xStock",
+    assetClass: "tokenized_public_equity",
+    channel: "Fluxion + Bybit",
+    imageUrl: "/assets/tslax.png",
+    issuer: "xStocksFi",
+    issuerImageUrl: "/assets/xstocks.png",
+  },
+  {
+    id: "syrupusdt",
+    symbol: "syrupUSDT",
+    name: "Maple syrupUSDT",
+    assetClass: "institutional_yield",
+    channel: "Aave on Mantle",
+    imageUrl: "/assets/syrupusdt.png",
+    issuer: "Maple Finance",
+    issuerImageUrl: "/assets/maple.jpg",
+  },
 ];
+
+function assetImage(assetList: AssetOption[], id: string, report?: DistributionReport | null) {
+  if (report?.asset.id === id && report.asset.imageUrl) return report.asset.imageUrl;
+  return assetList.find((a) => a.id === id)?.imageUrl;
+}
 
 export default function App() {
   const [assets, setAssets] = useState<AssetOption[]>([]);
@@ -216,9 +244,11 @@ export default function App() {
       <header className="border-b border-zinc-900/80 bg-zinc-950/70 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-sm">
-              M
-            </div>
+            <img
+              src="/assets/mantle.png"
+              alt="Mantle"
+              className="w-8 h-8 rounded-lg object-cover border border-zinc-800 bg-zinc-900"
+            />
             <div>
               <div className="text-sm font-semibold text-white leading-tight">
                 Distribution Friction Agent
@@ -252,6 +282,9 @@ export default function App() {
               <span className="text-red-400">compliance friction</span> for Mantle RWAs — live.
             </p>
             <ScoreLegend />
+            <div className="mt-5">
+              <PartnerStrip />
+            </div>
           </motion.div>
           <motion.div
             className="shrink-0 w-full max-w-xs lg:max-w-sm"
@@ -267,7 +300,7 @@ export default function App() {
           assets={assetList.map((a) => ({
             id: a.id,
             symbol: a.symbol,
-            icon: ASSET_ICONS[a.id] ?? "📊",
+            imageUrl: assetImage(assetList, a.id, report),
             preview: previews[a.id],
           }))}
           selected={selected}
@@ -291,8 +324,13 @@ export default function App() {
                     : "bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
                 }`}
               >
-                <span>
-                  <span className="mr-1.5">{ASSET_ICONS[a.id] ?? "📊"}</span>
+                <span className="flex items-center gap-2">
+                  <AssetAvatar
+                    src={assetImage(assetList, a.id, report)}
+                    symbol={a.symbol}
+                    size="sm"
+                    ring={isActive ? "neutral" : undefined}
+                  />
                   {a.symbol}
                 </span>
                 <span className="flex gap-1">
@@ -375,10 +413,31 @@ export default function App() {
               className="bg-zinc-950/50 border border-zinc-800/50 rounded-2xl p-6 sm:p-8 shadow-[0_0_80px_-20px_rgba(16,185,129,0.12)]"
             >
               <div className="flex flex-col lg:flex-row gap-8 items-start justify-between">
-                <div className="flex-1 min-w-0">
+                <div className="flex gap-5 flex-1 min-w-0">
+                  <div className="relative shrink-0">
+                    <AssetAvatar
+                      src={report.asset.imageUrl}
+                      symbol={report.asset.symbol}
+                      size="hero"
+                      ring="neutral"
+                      className="shadow-[0_0_40px_-8px_rgba(16,185,129,0.35)]"
+                    />
+                    <img
+                      src="/assets/mantle.png"
+                      alt="Mantle"
+                      className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full border-2 border-zinc-950 object-cover bg-zinc-900"
+                      title="Mantle ecosystem"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
                   <div className="text-xs font-mono text-zinc-500 mb-1">ANALYZING</div>
                   <h2 className="text-2xl font-bold text-white mb-1">{report.asset.name}</h2>
-                  <p className="text-sm text-zinc-500 mb-4">{report.asset.distributionChannel}</p>
+                  <p className="text-sm text-zinc-500 mb-2">{report.asset.distributionChannel}</p>
+                  <IssuerBadge
+                    src={report.asset.issuerImageUrl}
+                    name={report.asset.issuer}
+                    className="mb-4"
+                  />
 
                   <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg px-4 py-3 text-sm text-zinc-400 leading-relaxed">
                     <strong className="text-zinc-200">Thesis:</strong> Issuance is solved. Distribution
@@ -392,6 +451,7 @@ export default function App() {
                             : "📈 Distribution infrastructure is the main growth lever."}
                       </span>
                     )}
+                  </div>
                   </div>
                 </div>
 

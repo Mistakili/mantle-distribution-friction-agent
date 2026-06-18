@@ -9,6 +9,9 @@ export interface AssetProfile {
   name: string;
   assetClass: AssetClass;
   coingeckoId?: string;
+  /** Local or remote token logo — overridden by live CoinGecko image when available. */
+  imageUrl: string;
+  issuerImageUrl: string;
   issuer: string;
   distributionChannel: string;
   compliance: {
@@ -28,6 +31,8 @@ export const ASSETS: Record<string, AssetProfile> = {
     name: "SpaceX xStock (tokenized pre-IPO equity)",
     assetClass: "tokenized_pre_ipo_equity",
     coingeckoId: "spacex-xstocks",
+    imageUrl: "/assets/spcxx.png",
+    issuerImageUrl: "/assets/xstocks.png",
     issuer: "xStocksFi",
     distributionChannel: "Fluxion Network + Bybit (xStocks execution)",
     compliance: {
@@ -48,6 +53,8 @@ export const ASSETS: Record<string, AssetProfile> = {
     name: "Tesla xStock (tokenized public equity)",
     assetClass: "tokenized_public_equity",
     coingeckoId: "tesla-xstock",
+    imageUrl: "/assets/tslax.png",
+    issuerImageUrl: "/assets/xstocks.png",
     issuer: "xStocksFi",
     distributionChannel: "Fluxion Network + Bybit",
     compliance: {
@@ -66,6 +73,8 @@ export const ASSETS: Record<string, AssetProfile> = {
     symbol: "syrupUSDT",
     name: "Maple syrupUSDT (institutional lending yield)",
     assetClass: "institutional_yield",
+    imageUrl: "/assets/syrupusdt.png",
+    issuerImageUrl: "/assets/maple.jpg",
     issuer: "Maple Finance",
     distributionChannel: "Aave on Mantle",
     compliance: {

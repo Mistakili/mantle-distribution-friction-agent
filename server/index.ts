@@ -58,6 +58,9 @@ const server = createServer(async (req, res) => {
       name: a.name,
       assetClass: a.assetClass,
       channel: a.distributionChannel,
+      imageUrl: a.imageUrl,
+      issuer: a.issuer,
+      issuerImageUrl: a.issuerImageUrl,
     }));
     return json(res, 200, list);
   }
