@@ -47,7 +47,7 @@ export const ASSETS: Record<string, AssetProfile> = {
     symbol: "TSLAx",
     name: "Tesla xStock (tokenized public equity)",
     assetClass: "tokenized_public_equity",
-    coingeckoId: "tesla-xstocks",
+    coingeckoId: "tesla-xstock",
     issuer: "xStocksFi",
     distributionChannel: "Fluxion Network + Bybit",
     compliance: {

@@ -7,10 +7,29 @@
   "scripts": {
     "score": "tsx scripts/score.ts",
     "score:spcxx": "tsx scripts/score.ts --asset spcxx",
-    "score:tslax": "tsx scripts/score.ts --asset tslax"
+    "score:tslax": "tsx scripts/score.ts --asset tslax",
+    "dev": "concurrently -n api,web -c cyan,magenta \"tsx watch server/index.ts\" \"vite --config web/vite.config.ts\"",
+    "dev:api": "tsx watch server/index.ts",
+    "dev:web": "vite --config web/vite.config.ts",
+    "build": "vite build --config web/vite.config.ts",
+    "start": "cross-env NODE_ENV=production tsx server/index.ts",
+    "preview": "npm run build && npm run start"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.62.0",
+    "@tailwindcss/vite": "^4.1.8",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^4.5.2",
+    "concurrently": "^9.2.0",
+    "cross-env": "^7.0.3",
+    "tailwindcss": "^4.1.8",
     "tsx": "^4.19.4",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "^6.3.5"
   }
 }

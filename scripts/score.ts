@@ -3,13 +3,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveAsset } from "../src/assets.js";
-import { scoreComplianceFriction } from "../src/compliance-friction.js";
-import {
-  fetchMarketMetrics,
-  fetchMantleEcosystemMetrics,
-  scoreDistributionHealth,
-} from "../src/metrics.js";
-import { buildReport, renderMarkdown } from "../src/report.js";
+import { runScore } from "../src/run-score.js";
+import { renderMarkdown } from "../src/report.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -27,28 +22,9 @@ async function main() {
   console.log(`\n🔍 Mantle Distribution Friction Agent`);
   console.log(`   Asset: ${asset.symbol} (${asset.name})\n`);
 
-  const ecosystem = await fetchMantleEcosystemMetrics();
-  console.log(`✓ Mantle ecosystem metrics (${ecosystem.source})`);
-
-  let market = null;
-  if (asset.coingeckoId) {
-    try {
-      market = await fetchMarketMetrics(asset.coingeckoId);
-      console.log(`✓ Market metrics (${market.source})`);
-    } catch (err) {
-      console.warn(`⚠ Market fetch failed: ${err instanceof Error ? err.message : err}`);
-    }
-  }
-
-  const distributionHealth = scoreDistributionHealth(market, ecosystem);
-  const complianceFriction = scoreComplianceFriction(asset);
-  const report = buildReport({
-    asset,
-    distributionHealth,
-    complianceFriction,
-    market,
-    ecosystem,
-  });
+  const report = await runScore(assetId);
+  const { distributionHealth, complianceFriction } = report;
+  console.log(`✓ Live data fetched`);
 
   const outDir = join(ROOT, "output");
   mkdirSync(outDir, { recursive: true });

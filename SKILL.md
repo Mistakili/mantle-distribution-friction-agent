@@ -44,9 +44,19 @@ to qualified holders globally without friction — is the harder problem. Compli
 
 ## Quick Start
 
+### Web UI
+
 ```bash
-pnpm install
-pnpm score --asset spcxx
+npm install
+npm run dev          # http://localhost:5173
+npm run preview      # production build → http://localhost:3000
+```
+
+### CLI
+
+```bash
+npm install
+npm run score --asset spcxx
 cat output/spcxx-report.md
 ```
 

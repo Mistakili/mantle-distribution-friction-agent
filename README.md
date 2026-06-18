@@ -16,9 +16,26 @@ Built by [@Mistakili](https://github.com/Mistakili) — extends the [Compliance 
 
 ## Quick start
 
+### Web UI (recommended for demos)
+
 ```bash
-pnpm install
-pnpm score --asset spcxx
+npm install
+npm run dev
+```
+
+Open **http://localhost:5173** — pick an asset, scores load live from CoinGecko + DefiLlama.
+
+Production:
+
+```bash
+npm run preview   # builds UI + serves on http://localhost:3000
+```
+
+### CLI
+
+```bash
+npm install
+npm run score:spcxx
 ```
 
 Outputs:
