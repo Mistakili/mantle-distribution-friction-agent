@@ -1,0 +1,16 @@
+{
+  "name": "mantle-distribution-friction-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Track 2 research agent for Mantle Research Challenge — scores RWA distribution health and compliance friction",
+  "scripts": {
+    "score": "tsx scripts/score.ts",
+    "score:spcxx": "tsx scripts/score.ts --asset spcxx",
+    "score:tslax": "tsx scripts/score.ts --asset tslax"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4",
+    "typescript": "^5.9.3"
+  }
+}
