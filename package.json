@@ -19,8 +19,10 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
+  "overrides": {
+    "shell-quote": "1.8.4"
+  },
   "devDependencies": {
-    "@rollup/rollup-win32-x64-msvc": "^4.62.0",
     "@tailwindcss/vite": "^4.1.8",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",

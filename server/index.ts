@@ -79,7 +79,7 @@ const server = createServer(async (req, res) => {
   if (req.method === "GET" && url.pathname === "/") {
     return json(res, 200, {
       name: "Mantle Distribution Friction Agent API",
-      ui: IS_PROD ? "/" : "http://localhost:5173",
+      ui: IS_PROD ? "/" : "http://localhost:5000",
       endpoints: ["/api/assets", "/api/score/:assetId"],
     });
   }
@@ -92,6 +92,6 @@ server.listen(PORT, () => {
   if (IS_PROD && existsSync(DIST)) {
     console.log(`Serving UI from ${DIST}`);
   } else {
-    console.log(`Dev UI: vite on http://localhost:5173 (proxies /api here)`);
+    console.log(`Dev UI: vite on http://localhost:5000 (proxies /api here)`);
   }
 });
