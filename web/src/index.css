@@ -8,3 +8,52 @@
 body {
   @apply bg-[#080808] text-zinc-300 antialiased font-sans;
 }
+
+.ambient-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.45;
+}
+
+.ambient-orb-a {
+  width: 420px;
+  height: 420px;
+  background: rgba(16, 185, 129, 0.18);
+  top: -120px;
+  left: -80px;
+  animation: drift-a 18s ease-in-out infinite;
+}
+
+.ambient-orb-b {
+  width: 360px;
+  height: 360px;
+  background: rgba(239, 68, 68, 0.12);
+  top: 40%;
+  right: -100px;
+  animation: drift-b 22s ease-in-out infinite;
+}
+
+.ambient-orb-c {
+  width: 280px;
+  height: 280px;
+  background: rgba(99, 102, 241, 0.08);
+  bottom: -60px;
+  left: 35%;
+  animation: drift-c 26s ease-in-out infinite;
+}
+
+@keyframes drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(40px, 30px) scale(1.08); }
+}
+
+@keyframes drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-50px, -20px) scale(1.05); }
+}
+
+@keyframes drift-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(20px, -35px) scale(1.1); }
+}

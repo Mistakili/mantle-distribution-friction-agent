@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import {
   fetchAssets,
   fetchScore,
@@ -8,76 +9,12 @@ import {
   type AssetScorePreview,
 } from "./api";
 import type { AssetOption, DistributionReport } from "./types";
+import { AmbientBackground } from "./components/AmbientBackground";
+import { CompareStrip } from "./components/CompareStrip";
+import { DistributionFlowViz } from "./components/DistributionFlowViz";
+import { ScoreRing } from "./components/ScoreRing";
 
 type LoadPhase = "idle" | "loading" | "slow" | "done" | "error";
-
-function ScoreRing({
-  score,
-  max = 10,
-  polarity,
-  label,
-  sublabel,
-}: {
-  score: number;
-  max?: number;
-  polarity: "positive" | "negative";
-  label: string;
-  sublabel: string;
-}) {
-  const isPositive = polarity === "positive";
-  const color = isPositive ? "#10b981" : "#ef4444";
-  const pct = (score / max) * 100;
-  const r = 54;
-  const c = 2 * Math.PI * r;
-  const offset = c - (pct / 100) * c;
-
-  return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="relative w-36 h-36">
-        <div
-          className={`absolute -top-1 -right-1 z-10 w-7 h-7 rounded-full flex items-center justify-center text-xs border ${
-            isPositive
-              ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
-              : "bg-red-500/20 border-red-500/40 text-red-400"
-          }`}
-          title={isPositive ? "Higher is better" : "Higher means more blocked"}
-        >
-          {isPositive ? "↑" : "⛔"}
-        </div>
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r={r} fill="none" stroke="#27272a" strokeWidth="10" />
-          <circle
-            cx="60"
-            cy="60"
-            r={r}
-            fill="none"
-            stroke={color}
-            strokeWidth="10"
-            strokeLinecap="round"
-            strokeDasharray={c}
-            strokeDashoffset={offset}
-            className="transition-all duration-700"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`text-3xl font-extrabold ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
-            {score}
-          </span>
-          <span className="text-xs text-zinc-500">/ {max}</span>
-        </div>
-      </div>
-      <div className="text-center max-w-[9rem]">
-        <div className="text-sm font-semibold text-white">{label}</div>
-        <div
-          className={`text-[11px] mt-0.5 font-medium ${isPositive ? "text-emerald-500/80" : "text-red-400/90"}`}
-        >
-          {isPositive ? "↑ higher is better" : "⛔ higher = more blocked"}
-        </div>
-        <div className="text-xs text-zinc-500 capitalize mt-0.5">{sublabel}</div>
-      </div>
-    </div>
-  );
-}
 
 function ScoreLegend() {
   return (
@@ -274,8 +211,9 @@ export default function App() {
   const isRefreshing = loadPhase === "loading" || loadPhase === "slow";
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur sticky top-0 z-10">
+    <div className="min-h-screen relative">
+      <AmbientBackground />
+      <header className="border-b border-zinc-900/80 bg-zinc-950/70 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-sm">
@@ -298,17 +236,43 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-2">
-            Where does distribution break?
-          </h1>
-          <p className="text-zinc-400 max-w-2xl text-lg leading-relaxed mb-3">
-            Issuance is solved. Score <span className="text-emerald-400">liquidity health</span> and{" "}
-            <span className="text-red-400">compliance friction</span> for Mantle RWAs — live.
-          </p>
-          <ScoreLegend />
+      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8 relative z-[1]">
+        <div className="flex flex-col lg:flex-row gap-8 items-center">
+          <motion.div
+            className="flex-1 min-w-0"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-2">
+              Where does distribution break?
+            </h1>
+            <p className="text-zinc-400 max-w-2xl text-lg leading-relaxed mb-3">
+              Issuance is solved. Score <span className="text-emerald-400">liquidity health</span> and{" "}
+              <span className="text-red-400">compliance friction</span> for Mantle RWAs — live.
+            </p>
+            <ScoreLegend />
+          </motion.div>
+          <motion.div
+            className="shrink-0 w-full max-w-xs lg:max-w-sm"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.15 }}
+          >
+            <DistributionFlowViz frictionScore={friction?.score} />
+          </motion.div>
         </div>
+
+        <CompareStrip
+          assets={assetList.map((a) => ({
+            id: a.id,
+            symbol: a.symbol,
+            icon: ASSET_ICONS[a.id] ?? "📊",
+            preview: previews[a.id],
+          }))}
+          selected={selected}
+          onSelect={setSelected}
+        />
 
         <div className="flex flex-wrap gap-2">
           {assetList.map((a) => {
@@ -403,7 +367,13 @@ export default function App() {
               </div>
             )}
 
-            <div className="bg-zinc-950/50 border border-zinc-800/50 rounded-2xl p-6 sm:p-8">
+            <motion.div
+              key={report.asset.id}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
+              className="bg-zinc-950/50 border border-zinc-800/50 rounded-2xl p-6 sm:p-8 shadow-[0_0_80px_-20px_rgba(16,185,129,0.12)]"
+            >
               <div className="flex flex-col lg:flex-row gap-8 items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-mono text-zinc-500 mb-1">ANALYZING</div>
@@ -444,9 +414,18 @@ export default function App() {
                   )}
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <motion.div
+              className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: { transition: { staggerChildren: 0.08 } },
+              }}
+            >
+              <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}>
               <Section title="Asset market">
                 {report.market ? (
                   <>
@@ -477,7 +456,9 @@ export default function App() {
                   <p className="text-sm text-zinc-500">No live market data — ecosystem scores only.</p>
                 )}
               </Section>
+              </motion.div>
 
+              <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}>
               <Section title="Mantle ecosystem">
                 <MetricRow label="Chain TVL" value={fmtUsd(report.ecosystem.chainTvlUsd)} />
                 <MetricRow label="RWA TVL (est.)" value={fmtUsd(report.ecosystem.rwaTvlUsd)} />
@@ -488,7 +469,8 @@ export default function App() {
                   source: {report.ecosystem.source}
                 </div>
               </Section>
-            </div>
+              </motion.div>
+            </motion.div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {health && (
@@ -501,9 +483,11 @@ export default function App() {
                           <span className="text-emerald-400 font-mono">{c.score}/10</span>
                         </div>
                         <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                            style={{ width: `${(c.score / 10) * 100}%` }}
+                          <motion.div
+                            className="h-full bg-emerald-500 rounded-full"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(c.score / 10) * 100}%` }}
+                            transition={{ duration: 0.7, ease: "easeOut" }}
                           />
                         </div>
                         <p className="text-[11px] text-zinc-600 mt-1">{c.detail}</p>
