@@ -1,0 +1,13 @@
+uploads = []
+
+[[generated]]
+id = "mKyiW4yc2EE1xcRX743ev"
+uri = "file://attached_assets/logo.png"
+type = "image"
+title = "mantle agent logo"
+
+[[outputs]]
+id = "XhozdA_U7ja_uv4eR6pVr"
+uri = "file://attached_assets/logo.png"
+type = "image"
+title = "Mantle Distribution Friction Agent — Logo"
