@@ -1,20 +1,31 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { fetchAssets, fetchScore, fmtUsd } from "./api";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  fetchAssets,
+  fetchScore,
+  FetchTimeoutError,
+  fmtUsd,
+  SLOW_HINT_MS,
+  type AssetScorePreview,
+} from "./api";
 import type { AssetOption, DistributionReport } from "./types";
+
+type LoadPhase = "idle" | "loading" | "slow" | "done" | "error";
 
 function ScoreRing({
   score,
   max = 10,
-  color,
+  polarity,
   label,
   sublabel,
 }: {
   score: number;
   max?: number;
-  color: string;
+  polarity: "positive" | "negative";
   label: string;
   sublabel: string;
 }) {
+  const isPositive = polarity === "positive";
+  const color = isPositive ? "#10b981" : "#ef4444";
   const pct = (score / max) * 100;
   const r = 54;
   const c = 2 * Math.PI * r;
@@ -23,6 +34,16 @@ function ScoreRing({
   return (
     <div className="flex flex-col items-center gap-3">
       <div className="relative w-36 h-36">
+        <div
+          className={`absolute -top-1 -right-1 z-10 w-7 h-7 rounded-full flex items-center justify-center text-xs border ${
+            isPositive
+              ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+              : "bg-red-500/20 border-red-500/40 text-red-400"
+          }`}
+          title={isPositive ? "Higher is better" : "Higher means more blocked"}
+        >
+          {isPositive ? "↑" : "⛔"}
+        </div>
         <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
           <circle cx="60" cy="60" r={r} fill="none" stroke="#27272a" strokeWidth="10" />
           <circle
@@ -39,15 +60,70 @@ function ScoreRing({
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-extrabold text-white">{score}</span>
+          <span className={`text-3xl font-extrabold ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
+            {score}
+          </span>
           <span className="text-xs text-zinc-500">/ {max}</span>
         </div>
       </div>
-      <div className="text-center">
+      <div className="text-center max-w-[9rem]">
         <div className="text-sm font-semibold text-white">{label}</div>
-        <div className="text-xs text-zinc-500 capitalize">{sublabel}</div>
+        <div
+          className={`text-[11px] mt-0.5 font-medium ${isPositive ? "text-emerald-500/80" : "text-red-400/90"}`}
+        >
+          {isPositive ? "↑ higher is better" : "⛔ higher = more blocked"}
+        </div>
+        <div className="text-xs text-zinc-500 capitalize mt-0.5">{sublabel}</div>
       </div>
     </div>
+  );
+}
+
+function ScoreLegend() {
+  return (
+    <div className="flex flex-wrap gap-4 text-xs font-mono">
+      <span className="flex items-center gap-1.5 text-emerald-500/90">
+        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+        Health ↑ better
+      </span>
+      <span className="flex items-center gap-1.5 text-red-400/90">
+        <span className="w-2 h-2 rounded-full bg-red-500" />
+        Friction ⛔ higher = blocked
+      </span>
+    </div>
+  );
+}
+
+function ScoreBadge({
+  value,
+  kind,
+  loading,
+}: {
+  value?: number;
+  kind: "health" | "friction";
+  loading?: boolean;
+}) {
+  if (loading) {
+    return (
+      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-600 animate-pulse">
+        …
+      </span>
+    );
+  }
+  if (value == null) return null;
+
+  const isHealth = kind === "health";
+  return (
+    <span
+      className={`px-1.5 py-0.5 rounded text-[10px] font-mono border ${
+        isHealth
+          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+          : "bg-red-500/10 border-red-500/30 text-red-400"
+      }`}
+      title={isHealth ? "Distribution health" : "Compliance friction"}
+    >
+      {isHealth ? "H" : "F"} {value.toFixed(1)}
+    </span>
   );
 }
 
@@ -75,45 +151,127 @@ const ASSET_ICONS: Record<string, string> = {
   syrupusdt: "🏦",
 };
 
+const FALLBACK_ASSETS: AssetOption[] = [
+  { id: "spcxx", symbol: "SPCXx", name: "SpaceX xStock", assetClass: "tokenized_pre_ipo_equity", channel: "Fluxion + Bybit" },
+  { id: "tslax", symbol: "TSLAx", name: "Tesla xStock", assetClass: "tokenized_public_equity", channel: "Fluxion + Bybit" },
+  { id: "syrupusdt", symbol: "syrupUSDT", name: "Maple syrupUSDT", assetClass: "institutional_yield", channel: "Aave on Mantle" },
+];
+
 export default function App() {
   const [assets, setAssets] = useState<AssetOption[]>([]);
   const [selected, setSelected] = useState("spcxx");
   const [report, setReport] = useState<DistributionReport | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loadPhase, setLoadPhase] = useState<LoadPhase>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
+  const [previews, setPreviews] = useState<Record<string, AssetScorePreview | "loading" | "error">>({});
 
-  const analyze = useCallback(async (assetId: string) => {
-    setLoading(true);
-    setError(null);
+  const cacheRef = useRef<Record<string, DistributionReport>>({});
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearSlowTimer = () => {
+    if (slowTimerRef.current) {
+      clearTimeout(slowTimerRef.current);
+      slowTimerRef.current = null;
+    }
+  };
+
+  const prefetchAsset = useCallback(async (assetId: string) => {
+    setPreviews((p) => ({ ...p, [assetId]: "loading" }));
     try {
       const data = await fetchScore(assetId);
-      setReport(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Analysis failed");
-      setReport(null);
-    } finally {
-      setLoading(false);
+      cacheRef.current[assetId] = data;
+      setPreviews((p) => ({
+        ...p,
+        [assetId]: {
+          health: data.distributionHealth.score,
+          friction: data.complianceFriction.score,
+          fetchedAt: data.generatedAt,
+        },
+      }));
+      return data;
+    } catch {
+      setPreviews((p) => ({ ...p, [assetId]: "error" }));
+      return null;
     }
   }, []);
+
+  const analyze = useCallback(
+    async (assetId: string, opts?: { force?: boolean }) => {
+      clearSlowTimer();
+      setError(null);
+      setStale(false);
+
+      const cached = cacheRef.current[assetId];
+      if (cached && !opts?.force) {
+        setReport(cached);
+        setLoadPhase("done");
+      } else {
+        setLoadPhase("loading");
+      }
+
+      slowTimerRef.current = setTimeout(() => {
+        setLoadPhase((phase) => (phase === "loading" ? "slow" : phase));
+      }, SLOW_HINT_MS);
+
+      try {
+        const data = await fetchScore(assetId);
+        clearSlowTimer();
+        cacheRef.current[assetId] = data;
+        setReport(data);
+        setLoadPhase("done");
+        setPreviews((p) => ({
+          ...p,
+          [assetId]: {
+            health: data.distributionHealth.score,
+            friction: data.complianceFriction.score,
+            fetchedAt: data.generatedAt,
+          },
+        }));
+      } catch (e) {
+        clearSlowTimer();
+        const msg =
+          e instanceof FetchTimeoutError
+            ? e.message
+            : e instanceof Error
+              ? e.message
+              : "Analysis failed";
+
+        if (cached) {
+          setReport(cached);
+          setStale(true);
+          setLoadPhase("done");
+          setError(`${msg} Showing last cached result.`);
+        } else {
+          setError(msg);
+          setLoadPhase("error");
+          if (!cached) setReport(null);
+        }
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     fetchAssets()
       .then(setAssets)
-      .catch(() =>
-        setAssets([
-          { id: "spcxx", symbol: "SPCXx", name: "SpaceX xStock", assetClass: "tokenized_pre_ipo_equity", channel: "Fluxion + Bybit" },
-          { id: "tslax", symbol: "TSLAx", name: "Tesla xStock", assetClass: "tokenized_public_equity", channel: "Fluxion + Bybit" },
-          { id: "syrupusdt", symbol: "syrupUSDT", name: "Maple syrupUSDT", assetClass: "institutional_yield", channel: "Aave on Mantle" },
-        ]),
-      );
+      .catch(() => setAssets(FALLBACK_ASSETS));
   }, []);
 
   useEffect(() => {
+    const list = assets.length ? assets : FALLBACK_ASSETS;
+    list.forEach((a) => prefetchAsset(a.id));
+  }, [assets, prefetchAsset]);
+
+  useEffect(() => {
     analyze(selected);
+    return clearSlowTimer;
   }, [selected, analyze]);
 
   const health = report?.distributionHealth;
   const friction = report?.complianceFriction;
+  const assetList = assets.length ? assets : FALLBACK_ASSETS;
+  const isRefreshing = loadPhase === "loading" || loadPhase === "slow";
 
   return (
     <div className="min-h-screen">
@@ -145,43 +303,106 @@ export default function App() {
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-2">
             Where does distribution break?
           </h1>
-          <p className="text-zinc-400 max-w-2xl text-lg leading-relaxed">
+          <p className="text-zinc-400 max-w-2xl text-lg leading-relaxed mb-3">
             Issuance is solved. Score <span className="text-emerald-400">liquidity health</span> and{" "}
-            <span className="text-amber-400">compliance friction</span> for Mantle RWAs — live.
+            <span className="text-red-400">compliance friction</span> for Mantle RWAs — live.
           </p>
+          <ScoreLegend />
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {assets.map((a) => (
-            <button
-              key={a.id}
-              onClick={() => setSelected(a.id)}
-              className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                selected === a.id
-                  ? "bg-emerald-600/20 border-emerald-500/50 text-emerald-300"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
-              }`}
-            >
-              <span className="mr-1.5">{ASSET_ICONS[a.id] ?? "📊"}</span>
-              {a.symbol}
-            </button>
-          ))}
+          {assetList.map((a) => {
+            const preview = previews[a.id];
+            const previewData = preview && preview !== "loading" && preview !== "error" ? preview : null;
+            const previewLoading = preview === "loading";
+            const isActive = selected === a.id;
+
+            return (
+              <button
+                key={a.id}
+                onClick={() => setSelected(a.id)}
+                className={`flex flex-col items-start gap-1.5 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all min-w-[7.5rem] ${
+                  isActive
+                    ? "bg-zinc-900 border-zinc-600 text-white ring-1 ring-emerald-500/30"
+                    : "bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                }`}
+              >
+                <span>
+                  <span className="mr-1.5">{ASSET_ICONS[a.id] ?? "📊"}</span>
+                  {a.symbol}
+                </span>
+                <span className="flex gap-1">
+                  <ScoreBadge value={previewData?.health} kind="health" loading={previewLoading} />
+                  <ScoreBadge value={previewData?.friction} kind="friction" loading={previewLoading} />
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        {error && (
-          <div className="bg-red-950/30 border border-red-900/50 rounded-lg px-4 py-3 text-red-400 text-sm">
-            {error}
+        {(error || stale) && (
+          <div
+            className={`rounded-lg px-4 py-3 text-sm flex items-start justify-between gap-3 ${
+              stale
+                ? "bg-amber-950/30 border border-amber-900/50 text-amber-300"
+                : "bg-red-950/30 border border-red-900/50 text-red-400"
+            }`}
+          >
+            <span>{error}</span>
+            {loadPhase === "error" && (
+              <button
+                onClick={() => analyze(selected, { force: true })}
+                className="shrink-0 text-xs font-mono underline underline-offset-2 hover:opacity-80"
+              >
+                Retry
+              </button>
+            )}
           </div>
         )}
 
-        {loading && !report && (
-          <div className="flex items-center justify-center py-24 text-zinc-500">
-            <span className="animate-pulse font-mono text-sm">Fetching live metrics…</span>
+        {loadPhase === "loading" && !report && (
+          <div className="flex flex-col items-center justify-center py-24 gap-3 text-zinc-500">
+            <div className="w-8 h-8 border-2 border-zinc-700 border-t-emerald-500 rounded-full animate-spin" />
+            <span className="font-mono text-sm">Fetching live metrics…</span>
+          </div>
+        )}
+
+        {loadPhase === "slow" && !report && (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <div className="w-8 h-8 border-2 border-zinc-700 border-t-amber-500 rounded-full animate-spin" />
+            <span className="font-mono text-sm text-amber-400/90">Still fetching — CoinGecko / DefiLlama can be slow</span>
+            <span className="text-xs text-zinc-600">Timeout in ~15s · scoring uses ecosystem data if market API fails</span>
+            <button
+              onClick={() => analyze(selected, { force: true })}
+              className="mt-2 text-xs font-mono text-zinc-500 underline underline-offset-2 hover:text-zinc-300"
+            >
+              Cancel & retry
+            </button>
+          </div>
+        )}
+
+        {loadPhase === "error" && !report && (
+          <div className="flex flex-col items-center justify-center py-24 gap-4">
+            <p className="text-zinc-500 text-sm text-center max-w-md">
+              Could not reach live data APIs. Check your connection or try again in a moment.
+            </p>
+            <button
+              onClick={() => analyze(selected, { force: true })}
+              className="px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-sm text-zinc-200 hover:bg-zinc-700 transition-colors"
+            >
+              Retry analysis
+            </button>
           </div>
         )}
 
         {report && (
-          <>
+          <div className={`space-y-8 transition-opacity duration-300 ${isRefreshing ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
+            {isRefreshing && (
+              <div className="text-center text-xs font-mono text-zinc-500 animate-pulse -mb-4">
+                Refreshing {report.asset.symbol}…
+              </div>
+            )}
+
             <div className="bg-zinc-950/50 border border-zinc-800/50 rounded-2xl p-6 sm:p-8">
               <div className="flex flex-col lg:flex-row gap-8 items-start justify-between">
                 <div className="flex-1 min-w-0">
@@ -204,21 +425,21 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex gap-8 sm:gap-12 shrink-0">
+                <div className="flex gap-6 sm:gap-10 shrink-0">
                   {health && (
                     <ScoreRing
                       score={health.score}
-                      color="#10b981"
+                      polarity="positive"
                       label="Distribution Health"
-                      sublabel={`${health.label} · higher is better`}
+                      sublabel={health.label}
                     />
                   )}
                   {friction && (
                     <ScoreRing
                       score={friction.score}
-                      color="#f59e0b"
+                      polarity="negative"
                       label="Compliance Friction"
-                      sublabel={`${friction.label} · higher = more blocked`}
+                      sublabel={friction.label}
                     />
                   )}
                 </div>
@@ -300,7 +521,7 @@ export default function App() {
                         key={c.name}
                         className="flex gap-3 text-sm py-1.5 border-b border-zinc-800/40 last:border-0"
                       >
-                        <span className="text-amber-500 font-mono shrink-0 w-8">+{c.friction}</span>
+                        <span className="text-red-400 font-mono shrink-0 w-8">+{c.friction}</span>
                         <div>
                           <span className="text-zinc-300 font-medium capitalize">
                             {c.name.replace(/_/g, " ")}
@@ -356,7 +577,7 @@ export default function App() {
                 Source on GitHub
               </a>
             </div>
-          </>
+          </div>
         )}
       </main>
     </div>
